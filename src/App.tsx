@@ -65,6 +65,28 @@ export function formatExternalUrl(url?: string | null): string {
   return `https://${trimmed}`;
 }
 
+export function ensureArray<T = any>(val: any): T[] {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'object') return Object.values(val) as T[];
+  return [];
+}
+
+export function sanitizeForFirebase<T>(obj: T): T {
+  if (obj === undefined) return "" as any;
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeForFirebase(item)) as any;
+  }
+  const cleanObj: Record<string, any> = {};
+  for (const [key, val] of Object.entries(obj as Record<string, any>)) {
+    if (val !== undefined) {
+      cleanObj[key] = sanitizeForFirebase(val);
+    }
+  }
+  return cleanObj as T;
+}
+
 export function getYouTubeInfo(url: string | undefined | null) {
   if (!url) return null;
   const trimmed = url.trim();
@@ -947,19 +969,19 @@ export default function App() {
       const data = snapshot.val();
       if (data && data.initialized) {
         isSyncingFromFirebase.current = true;
-        if (data.panels) setPanels(data.panels);
-        if (data.registeredUsers) setRegisteredUsers(data.registeredUsers);
-        if (data.bannedUsers) setBannedUsers(data.bannedUsers);
-        if (data.paymentHistory) setPaymentHistory(data.paymentHistory);
-        if (data.keyRequests) setKeyRequests(data.keyRequests);
+        if (data.panels) setPanels(ensureArray(data.panels));
+        if (data.registeredUsers) setRegisteredUsers(ensureArray(data.registeredUsers));
+        if (data.bannedUsers) setBannedUsers(ensureArray(data.bannedUsers));
+        if (data.paymentHistory) setPaymentHistory(ensureArray(data.paymentHistory));
+        if (data.keyRequests) setKeyRequests(ensureArray(data.keyRequests));
         if (data.paymentSettings) setPaymentSettings(data.paymentSettings);
         if (data.supportLinks) setSupportLinks(data.supportLinks);
         if (data.accessFileSteps) setAccessFileSteps(data.accessFileSteps);
         if (data.referWebsiteLink) setReferWebsiteLink(data.referWebsiteLink);
         if (data.referBonusAmount) setReferBonusAmount(data.referBonusAmount);
-        if (data.spinRewards) setSpinRewards(data.spinRewards);
-        if (data.spinRequests) setSpinRequests(data.spinRequests);
-        if (data.referRequests) setReferRequests(data.referRequests);
+        if (data.spinRewards) setSpinRewards(ensureArray(data.spinRewards));
+        if (data.spinRequests) setSpinRequests(ensureArray(data.spinRequests));
+        if (data.referRequests) setReferRequests(ensureArray(data.referRequests));
         if (data.userWallets) setUserWallets(data.userWallets);
         if (data.userAccountProfiles) setUserAccountProfiles(data.userAccountProfiles);
         if (data.userSpinTimestamps) setUserSpinTimestamps(data.userSpinTimestamps);
@@ -1007,7 +1029,7 @@ export default function App() {
       userBalance,
       updatedAt: Date.now()
     };
-    set(ref(database, 'appState'), payload).catch(e => {});
+    set(ref(database, 'appState'), sanitizeForFirebase(payload)).catch(e => {});
   }, [
     panels,
     registeredUsers,
@@ -1238,7 +1260,7 @@ export default function App() {
             { icon: LogIn, label: 'Login', view: 'login' }
           ].map((item, idx) => (
             <button 
-              key={idx} 
+              key={`sidemenu-${item.view}-${idx}`} 
               onClick={() => {
                 setCurrentView(item.view as any);
                 setIsMenuOpen(false);
@@ -1302,7 +1324,7 @@ export default function App() {
                         "Moba legend"
                       ].map((cat, idx) => (
                         <button
-                          key={idx}
+                          key={`cat-${cat}-${idx}`}
                           onClick={() => {
                             setSelectedCategory(cat);
                             setIsCategoryOpen(false);
@@ -1346,7 +1368,7 @@ export default function App() {
                   (selCatClean === '24ghanta' && (pCatClean.includes('24ghanta') || pCatClean.includes('house')));
 
                 return matchesSearch && matchesCat;
-              }).map(panel => {
+              }).map((panel, pIdx) => {
                 const imgYt = getYouTubeInfo(panel.image);
                 const videoYt = getYouTubeInfo(panel.videoLink);
                 const activeYt = videoYt || imgYt;
@@ -1355,7 +1377,7 @@ export default function App() {
                   : (panel.image || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop");
 
                 return (
-                  <div key={panel.id} className="relative rounded-2xl p-[2.5px] bg-live-gradient animate-color-shift bg-gradient-to-r from-red-500 via-yellow-400 via-emerald-400 via-cyan-400 via-fuchsia-500 to-pink-500 shadow-[0_0_35px_rgba(217,70,239,0.5)] group overflow-hidden mx-1 mb-5 transition-transform hover:scale-[1.01]">
+                  <div key={`store-panel-${panel.id}-${pIdx}`} className="relative rounded-2xl p-[2.5px] bg-live-gradient animate-color-shift bg-gradient-to-r from-red-500 via-yellow-400 via-emerald-400 via-cyan-400 via-fuchsia-500 to-pink-500 shadow-[0_0_35px_rgba(217,70,239,0.5)] group overflow-hidden mx-1 mb-5 transition-transform hover:scale-[1.01]">
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-in-out pointer-events-none"></div>
                     
                     <div className="bg-white/[0.05] backdrop-blur-md  hover:bg-[#03000d]/15 rounded-[13px] p-3 flex flex-col gap-3  h-full w-full relative z-10 shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),0_10px_35px_rgba(0,0,0,0.3)] border border-white/25 transition-colors">
@@ -1457,7 +1479,7 @@ export default function App() {
                       {/* Features List */}
                       <div className={`flex flex-col gap-1.5 mt-1 transition-all overflow-y-auto pr-1 custom-scrollbar ${expandedPanels[panel.id] ? 'max-h-60' : 'max-h-24'}`}>
                         {(expandedPanels[panel.id] ? panel.features : panel.features.slice(0, 3)).map((feature, idx) => (
-                          <div key={idx} className="flex items-center gap-2 bg-black/10 backdrop-blur-sm border border-white/15  rounded-md py-1.5 px-2.5 shrink-0">
+                          <div key={`feat-${panel.id}-${idx}`} className="flex items-center gap-2 bg-black/10 backdrop-blur-sm border border-white/15  rounded-md py-1.5 px-2.5 shrink-0">
                             <Zap size={14} className="text-fuchsia-500 fill-fuchsia-500" />
                             <span className="font-semibold text-gray-200 text-[12px]">{feature}</span>
                           </div>
@@ -1529,7 +1551,7 @@ export default function App() {
                           }}
                         >
                           {panel.pricing.map((plan, idx) => (
-                            <option key={idx} value={plan.price} className="bg-black/60 text-white">₹{plan.price} - {plan.label}</option>
+                            <option key={`price-${panel.id}-${plan.price}-${idx}`} value={plan.price} className="bg-black/60 text-white">₹{plan.price} - {plan.label}</option>
                           ))}
                         </select>
                         <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
@@ -1597,7 +1619,7 @@ export default function App() {
 
           {currentView === 'myKeys' && (() => {
             const activeAccKey = getAccountKey(userProfile.email, userProfile.phone);
-            const userKeyRequests = keyRequests.filter(req => {
+            const userKeyRequests = ensureArray(keyRequests).filter(req => {
               if (req.userAccountKey) {
                 return req.userAccountKey === activeAccKey;
               }
@@ -1638,13 +1660,13 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    userKeyRequests.map(req => {
+                    userKeyRequests.map((req, idx) => {
                       const isDelivered = req.status === 'APPROVED' || req.status === 'DELIVERED';
 
                       if (!isDelivered) {
                         return (
                           <div 
-                            key={req.id} 
+                            key={`mykey-pending-${req.id}-${idx}`} 
                             className="relative bg-black/20 backdrop-blur-md  border-2 border-purple-500/70 rounded-[22px] p-5 shadow-[0_0_30px_rgba(168,85,247,0.4)]  overflow-hidden flex flex-col gap-1 transition-all hover:border-purple-400"
                           >
                             <div className="absolute inset-0 bg-gradient-to-br from-red-950/20 via-purple-950/30 to-black pointer-events-none"></div>
@@ -1690,7 +1712,7 @@ export default function App() {
 
                       return (
                         <div 
-                          key={req.id} 
+                          key={`mykey-delivered-${req.id}-${idx}`} 
                           className="relative bg-black/20 backdrop-blur-md  border-2 border-purple-500/70 rounded-[22px] p-5 shadow-[0_0_30px_rgba(168,85,247,0.4)]  overflow-hidden flex flex-col gap-1 transition-all hover:border-purple-400"
                         >
                           <div className="absolute inset-0 bg-gradient-to-br from-emerald-950/20 via-purple-950/30 to-black pointer-events-none"></div>
@@ -1770,7 +1792,7 @@ export default function App() {
               
               {/* Voice Payment Guidance Banner (Audio Only) Removed from UI, voice still plays on mount */}
               
-              {paymentHistory.some(p => p.status === 'REJECTED') && showRejectedAlert && (
+              {ensureArray(paymentHistory).some(p => p.status === 'REJECTED') && showRejectedAlert && (
                 <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-3 flex items-start justify-between mb-3">
                   <p className="text-red-400 text-sm font-semibold pr-2">Aapne UTR number galat diye ho isiliye aapka payment reject ho gaya hai. Kripya sahi UTR number darj karen.</p>
                   <button onClick={() => setShowRejectedAlert(false)} className="text-red-400 hover:text-red-300"><X size={16} /></button>
@@ -1977,7 +1999,7 @@ export default function App() {
                           id: newTxId,
                           amount: Number(amount),
                           utr: utr.trim(),
-                          screenshot: paymentScreenshot || undefined,
+                          screenshot: paymentScreenshot || '',
                           status: 'PENDING',
                           date: new Date().toLocaleString(),
                           userEmail: curEmail,
@@ -1987,7 +2009,7 @@ export default function App() {
                         };
 
                         setCurrentTxId(newTxId);
-                        setPaymentHistory(prev => [newPayment, ...prev]);
+                        setPaymentHistory(prev => [newPayment, ...ensureArray(prev)]);
                         setFundStep('checking');
                       }}
                       disabled={!amount || !utr}
@@ -2000,7 +2022,8 @@ export default function App() {
                 )}
 
                 {fundStep === 'checking' && (() => {
-                  const activeTx = currentTxId ? paymentHistory.find(p => p.id === currentTxId) : paymentHistory[0];
+                  const safeHist = ensureArray(paymentHistory);
+                  const activeTx = currentTxId ? safeHist.find(p => p.id === currentTxId) : safeHist[0];
                   
                   if (activeTx?.status === 'SUCCESS') {
                     return (
@@ -2097,6 +2120,16 @@ export default function App() {
                           )}
                         </div>
                       )}
+
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setFundStep('confirm');
+                        }}
+                        className="w-full max-w-[260px] mt-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs py-2.5 rounded-xl border border-cyan-400/40 uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                      >
+                        <ArrowLeft size={16} /> Edit / Re-Submit Payment Details
+                      </button>
                     </div>
                   );
                 })()}
@@ -2112,7 +2145,7 @@ export default function App() {
                 <div className="flex flex-col gap-3">
                   {(() => {
                     const activeKey = getAccountKey(userProfile.email, userProfile.phone);
-                    const userPaymentHistory = paymentHistory.filter(history => {
+                    const userPaymentHistory = ensureArray(paymentHistory).filter(history => {
                       if (history.userAccountKey) {
                         return history.userAccountKey === activeKey;
                       }
@@ -2132,12 +2165,12 @@ export default function App() {
                       );
                     }
 
-                    return userPaymentHistory.map(history => {
+                    return userPaymentHistory.map((history, idx) => {
                       const isSuccess = history.status === 'SUCCESS';
                       const isRejected = history.status === 'REJECTED';
                       return (
                         <div 
-                          key={history.id} 
+                          key={`payhist-${history.id}-${idx}`} 
                           className={`border-l-[4px] ${isSuccess ? 'border-green-500 bg-green-950/30 border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.15)]' : isRejected ? 'border-red-500 bg-red-950/20 border-red-500/30' : 'border-yellow-500 bg-black/20 backdrop-blur-md border-fuchsia-500/20'} rounded-r-xl rounded-l-sm p-3 relative overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.5)] `}
                         >
                            <div className="absolute -right-4 -bottom-4 opacity-[0.03]">
@@ -2222,7 +2255,7 @@ export default function App() {
                             const angle = angles[idx % angles.length];
                             return (
                               <div 
-                                key={idx} 
+                                key={`wheel-reward-${reward}-${idx}`} 
                                 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-black text-white text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]"
                                 style={{
                                   transform: `rotate(${angle}deg) translateY(-85px)`
@@ -2354,7 +2387,7 @@ export default function App() {
                            const remMins = Math.max(0, Math.floor((remMs % (1000 * 60 * 60)) / (1000 * 60)));
 
                            return (
-                             <div key={idx} className="bg-purple-950/40 border border-purple-500/30 rounded-lg p-2.5 flex justify-between items-center text-xs">
+                             <div key={`active-coupon-card-${coupon.code}-${idx}`} className="bg-purple-950/40 border border-purple-500/30 rounded-lg p-2.5 flex justify-between items-center text-xs">
                                <div>
                                  <div className="flex items-center gap-2">
                                    <span className="text-yellow-400 font-mono font-bold text-sm block">{coupon.code}</span>
@@ -2512,9 +2545,9 @@ export default function App() {
               <div className="flex flex-col gap-4">
                  {[
                     { title: "Add New Panel", icon: PlusCircle, desc: "Manage store panels", color: "from-pink-400 to-fuchsia-600", view: 'adminAddPanel', badge: 0 },
-                    { title: "Delete Panel", icon: Trash2, desc: "Edit & delete active panels", color: "from-red-500 to-rose-700", view: 'adminDeletePanel', badge: panels.length },
+                    { title: "Delete Panel", icon: Trash2, desc: "Edit & delete active panels", color: "from-red-500 to-rose-700", view: 'adminDeletePanel', badge: ensureArray(panels).length },
                     { title: "Background Image", icon: ImageIcon, desc: "Gallery photo & 7-color live flowers", color: "from-amber-400 to-fuchsia-600", view: 'adminBgImage', badge: 0 },
-                    { title: "Payment Fund", icon: Wallet, desc: "Manage payment requests", color: "from-cyan-400 to-blue-600", view: 'adminPayment', badge: paymentHistory.filter(p => p.status === 'PENDING').length },
+                    { title: "Payment Fund", icon: Wallet, desc: "Manage payment requests", color: "from-cyan-400 to-blue-600", view: 'adminPayment', badge: ensureArray(paymentHistory).filter(p => p.status === 'PENDING').length },
                     { title: "USER WALLETS & HISTORY", icon: User, desc: "Manage users, photos & balances", color: "from-purple-500 to-pink-600", view: 'adminUserHistory', badge: 0 },
                     { title: "User Logins", icon: LogIn, desc: "View registered users", color: "from-blue-400 to-indigo-600", view: 'adminLogins', badge: unreadLogins },
                     { title: "Payment Settings", icon: CreditCard, desc: "QR & UPI Details", color: "from-teal-400 to-emerald-600", view: 'adminPaymentSettings', badge: 0 },
@@ -2527,7 +2560,7 @@ export default function App() {
                     { title: "STAFF PANEL", icon: Sparkles, desc: "Staff portal (PASS: PREM74)", color: "from-fuchsia-500 to-pink-600", view: 'staff', badge: 0 },
                  ].map((btn, idx) => (
                     <button 
-                      key={idx} 
+                      key={`admin-dash-btn-${btn.view}-${idx}`} 
                       onClick={() => {
                         setCurrentView(btn.view as any);
                         if (btn.view === 'adminKeys') setUnreadKeys(0);
@@ -2591,15 +2624,15 @@ export default function App() {
                 </h2>
               </div>
 
-              {registeredUsers.length === 0 ? (
+              {ensureArray(registeredUsers).length === 0 ? (
                 <div className="text-center text-gray-400 text-sm mt-10">No registered users yet. New user signups will appear here.</div>
               ) : (
-                registeredUsers.map((user, idx) => {
+                ensureArray(registeredUsers).map((user, idx) => {
                   const uKey = getAccountKey(user.email, user.phone);
                   const bal = userWallets[uKey] ?? 0;
 
                   // Filter payment fund requests for this user
-                  const userPayments = paymentHistory.filter(p => 
+                  const userPayments = ensureArray(paymentHistory).filter(p => 
                     (p.userEmail && user.email && p.userEmail.toLowerCase() === user.email.toLowerCase()) ||
                     (p.userPhone && user.phone && p.userPhone === user.phone)
                   );
@@ -2608,7 +2641,7 @@ export default function App() {
                     .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
 
                   // Filter key requests for this user
-                  const userKeys = keyRequests.filter(r => 
+                  const userKeys = ensureArray(keyRequests).filter(r => 
                     (r.userEmail && user.email && r.userEmail.toLowerCase() === user.email.toLowerCase()) ||
                     (r.userPhone && user.phone && r.userPhone === user.phone) ||
                     (user.email && r.user === user.email) ||
@@ -2620,7 +2653,7 @@ export default function App() {
                   const avatarUrl = user.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop";
 
                   return (
-                    <div key={idx} className="bg-black/20 backdrop-blur-md border-l-4 border-cyan-400 rounded-r-xl rounded-l-sm p-4 relative overflow-hidden shadow-[0_4px_25px_rgba(0,0,0,0.6)]  flex flex-col gap-3 text-left">
+                    <div key={`reguser-${user.email || user.phone || idx}-${idx}`} className="bg-black/20 backdrop-blur-md border-l-4 border-cyan-400 rounded-r-xl rounded-l-sm p-4 relative overflow-hidden shadow-[0_4px_25px_rgba(0,0,0,0.6)]  flex flex-col gap-3 text-left">
                        <div className="flex justify-between items-start gap-2">
                          <div className="flex items-center gap-3">
                            <img 
@@ -2919,7 +2952,7 @@ export default function App() {
                         }`}
                       >
                         Payments ({
-                          paymentHistory.filter(p => 
+                          ensureArray(paymentHistory).filter(p => 
                             (p.userEmail && editingAdminUser.email && p.userEmail.toLowerCase() === editingAdminUser.email.toLowerCase()) ||
                             (p.userPhone && editingAdminUser.phone && p.userPhone === editingAdminUser.phone)
                           ).length
@@ -2968,7 +3001,7 @@ export default function App() {
                     {editingAdminUser.activeTab === 'keys' && (
                       <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
                         {(() => {
-                          const userKeys = keyRequests.filter(r => 
+                          const userKeys = ensureArray(keyRequests).filter(r => 
                             (r.userEmail && editingAdminUser.email && r.userEmail.toLowerCase() === editingAdminUser.email.toLowerCase()) ||
                             (r.userPhone && editingAdminUser.phone && r.userPhone === editingAdminUser.phone) ||
                             (editingAdminUser.email && r.user === editingAdminUser.email) ||
@@ -2977,8 +3010,8 @@ export default function App() {
                           if (userKeys.length === 0) {
                             return <div className="text-center text-gray-500 text-xs py-4">No keys bought yet by this user.</div>;
                           }
-                          return userKeys.map(k => (
-                            <div key={k.id} className="bg-black/20 backdrop-blur-md p-2.5 rounded-lg border border-white/10 text-xs flex flex-col gap-1">
+                          return userKeys.map((k, idx) => (
+                            <div key={`userkey-${k.id}-${idx}`} className="bg-black/20 backdrop-blur-md p-2.5 rounded-lg border border-white/10 text-xs flex flex-col gap-1">
                               <div className="flex justify-between font-bold text-white">
                                 <span>{k.panelTitle || 'Panel Key'}</span>
                                 <span className="text-cyan-400">₹{k.price}</span>
@@ -3001,15 +3034,15 @@ export default function App() {
                     {editingAdminUser.activeTab === 'payments' && (
                       <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
                         {(() => {
-                          const userPay = paymentHistory.filter(p => 
+                          const userPay = ensureArray(paymentHistory).filter(p => 
                             (p.userEmail && editingAdminUser.email && p.userEmail.toLowerCase() === editingAdminUser.email.toLowerCase()) ||
                             (p.userPhone && editingAdminUser.phone && p.userPhone === editingAdminUser.phone)
                           );
                           if (userPay.length === 0) {
                             return <div className="text-center text-gray-500 text-xs py-4">No payment history found for this user.</div>;
                           }
-                          return userPay.map(p => (
-                            <div key={p.id} className="bg-black/20 backdrop-blur-md p-2.5 rounded-lg border border-white/10 text-xs flex flex-col gap-1">
+                          return userPay.map((p, idx) => (
+                            <div key={`userpay-${p.id}-${idx}`} className="bg-black/20 backdrop-blur-md p-2.5 rounded-lg border border-white/10 text-xs flex flex-col gap-1">
                               <div className="flex justify-between font-bold">
                                 <span className="text-emerald-400">₹{p.amount}</span>
                                 <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
@@ -3128,16 +3161,16 @@ export default function App() {
               {/* Pending Requests Section */}
               <div className="flex flex-col gap-3">
                 <h3 className="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-2">
-                  <Hourglass size={14} className="animate-spin" /> Pending Requests ({paymentHistory.filter(p => p.status === 'PENDING').length})
+                  <Hourglass size={14} className="animate-spin" /> Pending Requests ({ensureArray(paymentHistory).filter(p => p.status === 'PENDING').length})
                 </h3>
 
-                {paymentHistory.filter(p => p.status === 'PENDING').length === 0 ? (
+                {ensureArray(paymentHistory).filter(p => p.status === 'PENDING').length === 0 ? (
                   <div className="text-center text-gray-400 text-xs py-6 bg-black/20 backdrop-blur-md /60 border border-white/10 rounded-xl">
                     No pending payment requests at the moment.
                   </div>
                 ) : (
-                  paymentHistory.filter(p => p.status === 'PENDING').map(req => (
-                     <div key={req.id} className="bg-black/20 backdrop-blur-md border border-fuchsia-500/40 rounded-xl p-4 relative overflow-hidden shadow-[0_4px_25px_rgba(0,0,0,0.6)]  flex flex-col gap-3">
+                  ensureArray(paymentHistory).filter(p => p.status === 'PENDING').map((req, idx) => (
+                     <div key={`pending-payreq-${req.id}-${idx}`} className="bg-black/20 backdrop-blur-md border border-fuchsia-500/40 rounded-xl p-4 relative overflow-hidden shadow-[0_4px_25px_rgba(0,0,0,0.6)]  flex flex-col gap-3">
                         <div className="flex justify-between items-start">
                           <div>
                             <span className="text-gray-400 text-xs font-semibold block">Requested Fund</span>
@@ -3218,13 +3251,13 @@ export default function App() {
               </div>
 
               {/* Processed Payments Logs */}
-              {paymentHistory.filter(p => p.status !== 'PENDING').length > 0 && (
+              {ensureArray(paymentHistory).filter(p => p.status !== 'PENDING').length > 0 && (
                 <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-white/10">
                   <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                    Recent History ({paymentHistory.filter(p => p.status !== 'PENDING').length})
+                    Recent History ({ensureArray(paymentHistory).filter(p => p.status !== 'PENDING').length})
                   </h3>
-                  {paymentHistory.filter(p => p.status !== 'PENDING').map(req => (
-                    <div key={req.id} className="bg-black/50 border border-white/10 rounded-xl p-3 flex justify-between items-center text-xs">
+                  {ensureArray(paymentHistory).filter(p => p.status !== 'PENDING').map((req, idx) => (
+                    <div key={`processed-payreq-${req.id}-${idx}`} className="bg-black/50 border border-white/10 rounded-xl p-3 flex justify-between items-center text-xs">
                       <div className="flex flex-col gap-0.5">
                         <span className="text-white font-bold">₹{req.amount} - {req.userEmail || req.userPhone || 'User'}</span>
                         <span className="text-gray-400 text-[10px]">UTR: {req.utr}</span>
@@ -3265,11 +3298,11 @@ export default function App() {
                     onChange={(e) => setManualKeyForm(prev => ({ ...prev, targetAccount: e.target.value }))}
                     className="w-full bg-black/20 backdrop-blur-md border border-white/20 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-purple-400"
                   />
-                  {registeredUsers.length > 0 && (
+                  {ensureArray(registeredUsers).length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {registeredUsers.map((u, i) => (
+                      {ensureArray(registeredUsers).map((u, i) => (
                         <button 
-                          key={i} 
+                          key={`user-opt-${u.email || u.phone || i}-${i}`} 
                           type="button"
                           onClick={() => setManualKeyForm(prev => ({ ...prev, targetAccount: u.email || u.phone }))}
                           className="text-[10px] bg-purple-950/60 hover:bg-purple-900 border border-purple-500/30 text-purple-300 px-2 py-0.5 rounded"
@@ -3289,8 +3322,8 @@ export default function App() {
                     className="w-full bg-black/20 backdrop-blur-md border border-white/20 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-purple-400"
                   >
                     <option value="">Select a panel...</option>
-                    {panels.map(p => (
-                      <option key={p.id} value={p.title}>{p.title}</option>
+                    {ensureArray(panels).map((p, pIdx) => (
+                      <option key={`panel-opt-${p.id}-${pIdx}`} value={p.title}>{p.title}</option>
                     ))}
                   </select>
                 </div>
@@ -3347,11 +3380,11 @@ export default function App() {
               {/* Pending and Previous Key Requests List */}
               <div className="flex flex-col gap-3 mt-2">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                  All Key Orders ({keyRequests.length})
+                  All Key Orders ({ensureArray(keyRequests).length})
                 </h3>
 
-                {keyRequests.map(req => (
-                  <div key={req.id} className="bg-black/20 backdrop-blur-md border border-yellow-500/30 rounded-xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.5)] ">
+                {ensureArray(keyRequests).map((req, idx) => (
+                  <div key={`allkeyreq-${req.id}-${idx}`} className="bg-black/20 backdrop-blur-md border border-yellow-500/30 rounded-xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.5)] ">
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <span className="text-white font-bold text-sm block">{req.user}</span>
@@ -3445,8 +3478,8 @@ export default function App() {
                 </p>
 
                 <div className="flex flex-wrap gap-2 my-1">
-                  {spinRewards.map((amt, idx) => (
-                    <div key={idx} className="bg-fuchsia-950/60 border border-fuchsia-400/50 rounded-lg px-3 py-1.5 flex items-center gap-2">
+                  {ensureArray(spinRewards).map((amt, idx) => (
+                    <div key={`spinreward-${amt}-${idx}`} className="bg-fuchsia-950/60 border border-fuchsia-400/50 rounded-lg px-3 py-1.5 flex items-center gap-2">
                       <span className="text-yellow-400 font-mono font-black text-sm">₹{amt}</span>
                       <button 
                         onClick={() => {
@@ -3497,10 +3530,10 @@ export default function App() {
               
               <div className="flex flex-col gap-3 mt-2">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                  Recent Spin Logs ({spinRequests.length})
+                  Recent Spin Logs ({ensureArray(spinRequests).length})
                 </h3>
-                {spinRequests.map(spin => (
-                  <div key={spin.id} className="bg-black/20 backdrop-blur-md border border-green-500/30 rounded-xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.5)]  flex flex-col gap-2">
+                {ensureArray(spinRequests).map((spin, idx) => (
+                  <div key={`spinreq-${spin.id}-${idx}`} className="bg-black/20 backdrop-blur-md border border-green-500/30 rounded-xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.5)]  flex flex-col gap-2">
                     <div className="flex justify-between items-start">
                       <div>
                         <span className="text-green-400 font-bold text-sm block">Coupon Won: ₹{spin.prizeWon}</span>
@@ -3652,8 +3685,8 @@ export default function App() {
               </div>
 
               <div className="flex flex-col gap-3">
-                {referRequests.map(ref => (
-                  <div key={ref.id} className="bg-black/20 backdrop-blur-md border border-yellow-500/30 rounded-xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.5)]  flex flex-col gap-2">
+                {ensureArray(referRequests).map((ref, idx) => (
+                  <div key={`referreq-${ref.id}-${idx}`} className="bg-black/20 backdrop-blur-md border border-yellow-500/30 rounded-xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.5)]  flex flex-col gap-2">
                     <div className="flex justify-between items-start">
                       <div>
                         <span className="text-yellow-400 font-bold text-sm block">Bonus Amount: ₹{ref.bonusAmount}</span>
@@ -4019,12 +4052,12 @@ export default function App() {
                       return (
                         <>
                           <h4 className="text-white font-bold text-sm mb-1 flex items-center gap-2">
-                            <Key size={16} className="text-fuchsia-400" /> My Keys & Orders ({userKeyRequests.length})
+                            <Key size={16} className="text-fuchsia-400" /> My Keys & Orders ({ensureArray(userKeyRequests).length})
                           </h4>
 
                           {/* Pending Orders */}
-                          {userKeyRequests.filter(r => r.status === 'PENDING').map(req => (
-                            <div key={req.id} className="bg-amber-950/30 border border-amber-500/50 rounded-xl p-3 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+                          {ensureArray(userKeyRequests).filter(r => r.status === 'PENDING').map((req, idx) => (
+                            <div key={`staff-pendingkey-${req.id}-${idx}`} className="bg-amber-950/30 border border-amber-500/50 rounded-xl p-3 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
                               <div className="flex justify-between items-start mb-1">
                                 <div className="text-white text-xs font-bold">{req.panel}</div>
                                 <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
@@ -4038,8 +4071,8 @@ export default function App() {
                           ))}
 
                           {/* Delivered Keys */}
-                          {userKeyRequests.filter(r => r.status === 'APPROVED' || r.status === 'DELIVERED').map(req => (
-                             <div key={req.id} className="bg-emerald-950/30 border border-emerald-500/50 rounded-xl p-3 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                          {ensureArray(userKeyRequests).filter(r => r.status === 'APPROVED' || r.status === 'DELIVERED').map((req, idx) => (
+                             <div key={`staff-deliveredkey-${req.id}-${idx}`} className="bg-emerald-950/30 border border-emerald-500/50 rounded-xl p-3 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
                                <div className="flex justify-between items-start mb-1">
                                  <div className="text-white text-xs font-bold">{req.panel}</div>
                                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
@@ -4264,22 +4297,22 @@ export default function App() {
                   <div className="bg-black/20 backdrop-blur-md border border-purple-500/30 p-3 rounded-xl flex flex-col items-center justify-center text-center shadow-lg">
                     <User size={20} className="text-purple-400 mb-1" />
                     <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Total Users</span>
-                    <span className="text-white font-black text-lg">{registeredUsers.length}</span>
+                    <span className="text-white font-black text-lg">{ensureArray(registeredUsers).length}</span>
                   </div>
                   <div className="bg-black/20 backdrop-blur-md border border-emerald-500/30 p-3 rounded-xl flex flex-col items-center justify-center text-center shadow-lg">
                     <Wallet size={20} className="text-emerald-400 mb-1" />
                     <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Total Revenue</span>
-                    <span className="text-emerald-400 font-black text-lg">₹{paymentHistory.filter(p => p.status === 'SUCCESS').reduce((acc, curr) => acc + (curr.amount || 0), 0)}</span>
+                    <span className="text-emerald-400 font-black text-lg">₹{ensureArray(paymentHistory).filter(p => p.status === 'SUCCESS').reduce((acc, curr) => acc + (curr.amount || 0), 0)}</span>
                   </div>
                   <div className="bg-black/20 backdrop-blur-md border border-cyan-500/30 p-3 rounded-xl flex flex-col items-center justify-center text-center shadow-lg">
                     <LayoutDashboard size={20} className="text-cyan-400 mb-1" />
                     <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Active Panels</span>
-                    <span className="text-cyan-300 font-black text-lg">{panels.length}</span>
+                    <span className="text-cyan-300 font-black text-lg">{ensureArray(panels).length}</span>
                   </div>
                   <div className="bg-black/20 backdrop-blur-md border border-amber-500/30 p-3 rounded-xl flex flex-col items-center justify-center text-center shadow-lg">
                     <Hourglass size={20} className="text-amber-400 mb-1" />
                     <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Pending Fund</span>
-                    <span className="text-amber-400 font-black text-lg">{paymentHistory.filter(p => p.status === 'PENDING').length}</span>
+                    <span className="text-amber-400 font-black text-lg">{ensureArray(paymentHistory).filter(p => p.status === 'PENDING').length}</span>
                   </div>
                 </div>
 
@@ -4291,12 +4324,12 @@ export default function App() {
                     { id: 'house', label: '🏠 HOUSE PANEL (24GHANTA)', color: 'from-amber-500 to-orange-600' },
                     { id: 'managePanels', label: '🗑️ MANAGE PANELS', color: 'from-red-500 to-rose-600' },
                     { id: 'supportLinks', label: '💬 SUPPORT LINKS', color: 'from-sky-500 to-blue-600' },
-                    { id: 'users', label: `👥 USERS (${registeredUsers.length})`, color: 'from-purple-500 to-indigo-600' },
-                    { id: 'payments', label: `💰 PAYMENTS (${paymentHistory.length})`, color: 'from-emerald-500 to-teal-600' },
-                    { id: 'pendingKeys', label: `⏳ PENDING KEYS (${keyRequests.filter(r => r.status === 'PENDING').length})`, color: 'from-amber-600 to-yellow-600' },
+                    { id: 'users', label: `👥 USERS (${ensureArray(registeredUsers).length})`, color: 'from-purple-500 to-indigo-600' },
+                    { id: 'payments', label: `💰 PAYMENTS (${ensureArray(paymentHistory).length})`, color: 'from-emerald-500 to-teal-600' },
+                    { id: 'pendingKeys', label: `⏳ PENDING KEYS (${ensureArray(keyRequests).filter(r => r.status === 'PENDING').length})`, color: 'from-amber-600 to-yellow-600' },
                   ].map((tab) => (
                     <button
-                      key={tab.id}
+                      key={`staff-tab-${tab.id}`}
                       onClick={() => setStaffTab(tab.id as any)}
                       className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
                         staffTab === tab.id
@@ -4405,7 +4438,7 @@ export default function App() {
                         { name: 'Purple Theme', hue: 330, colorClass: 'bg-purple-500' },
                       ].map(theme => (
                         <button
-                          key={theme.name}
+                          key={`theme-${theme.name}`}
                           onClick={() => setBgSettings({ ...bgSettings, themeHue: theme.hue })}
                           className={`relative p-3 rounded-xl font-bold text-xs uppercase transition-all duration-300 border-2 overflow-hidden flex flex-col items-center gap-2
                             ${bgSettings.themeHue === theme.hue ? 'border-white scale-105 shadow-[0_0_20px_rgba(255,255,255,0.4)]' : 'border-transparent hover:border-white/30 hover:scale-105'}
@@ -4542,7 +4575,7 @@ export default function App() {
                           : ["Main Id safe", "Full safe NONROOT", "Esp crack anti-blacklist", "Auto headshot 100% working"];
 
                         setPanels(prev => [{
-                          id: prev.length + 1,
+                          id: Date.now(),
                           title: newPanelForm.title || "STAFF PANEL NEW",
                           category: newPanelForm.category || "NON ROOT",
                           thumbnailTitle: newPanelForm.title || "STAFF PANEL NEW",
@@ -4826,7 +4859,7 @@ export default function App() {
                         }
 
                         const newHousePanel = {
-                          id: panels.length + 1,
+                          id: Date.now(),
                           title: housePanelForm.title || "PRIVATE LIMITED 24GHANTA PANEL",
                           category: housePanelForm.category || "24ghanta",
                           thumbnailTitle: housePanelForm.title || "PRIVATE LIMITED 24GHANTA PANEL",
@@ -4917,8 +4950,8 @@ export default function App() {
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {panels.map((p) => (
-                          <div key={p.id} className="bg-black/20 backdrop-blur-md border border-white/10 p-3.5 rounded-xl flex flex-col justify-between gap-3 shadow-lg hover:border-rose-500/40 transition-all">
+                        {ensureArray(panels).map((p, idx) => (
+                          <div key={`staff-panel-${p.id}-${idx}`} className="bg-black/20 backdrop-blur-md border border-white/10 p-3.5 rounded-xl flex flex-col justify-between gap-3 shadow-lg hover:border-rose-500/40 transition-all">
                             <div className="flex items-start gap-3">
                               <img
                                 src={p.image}
@@ -5052,7 +5085,7 @@ export default function App() {
                         const avatarUrl = u.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop";
 
                         return (
-                          <div key={idx} className="bg-black/20 backdrop-blur-md border border-white/10 p-4 rounded-xl flex flex-col gap-3 shadow-lg hover:border-purple-500/40 transition-all">
+                          <div key={`manage-user-${u.email || u.phone || idx}-${idx}`} className="bg-black/20 backdrop-blur-md border border-white/10 p-4 rounded-xl flex flex-col gap-3 shadow-lg hover:border-purple-500/40 transition-all">
                             <div className="flex items-center justify-between gap-3">
                               <div className="flex items-center gap-3">
                                 <img
@@ -5129,7 +5162,7 @@ export default function App() {
                     </div>
                     <div className="bg-emerald-500/20 border border-emerald-500/40 px-3 py-2 rounded-xl text-emerald-300 font-black text-sm flex items-center gap-2 w-fit">
                       <span>Total Revenue:</span>
-                      <span className="text-white text-base">₹{paymentHistory.filter(p => p.status === 'SUCCESS').reduce((acc, curr) => acc + (curr.amount || 0), 0)}</span>
+                      <span className="text-white text-base">₹{ensureArray(paymentHistory).filter(p => p.status === 'SUCCESS').reduce((acc, curr) => acc + (curr.amount || 0), 0)}</span>
                     </div>
                   </div>
 
@@ -5155,13 +5188,13 @@ export default function App() {
                           (p.utr && p.utr.toLowerCase().includes(s))
                         );
                       })
-                      .map((p) => {
+                      .map((p, idx) => {
                         const targetKey = p.userAccountKey || getAccountKey(p.userEmail, p.userPhone);
                         const isPending = p.status === 'PENDING';
                         const isSuccess = p.status === 'SUCCESS';
 
                         return (
-                          <div key={p.id} className="bg-black/20 backdrop-blur-md border border-white/10 p-4 rounded-xl flex flex-col gap-3 shadow-lg">
+                          <div key={`house-pay-${p.id}-${idx}`} className="bg-black/20 backdrop-blur-md border border-white/10 p-4 rounded-xl flex flex-col gap-3 shadow-lg">
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex flex-col">
                                 <span className="text-white font-black text-sm">{p.userEmail || p.userPhone || 'User'}</span>
@@ -5248,10 +5281,10 @@ export default function App() {
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    {keyRequests
+                    {ensureArray(keyRequests)
                       .filter(r => r.status === 'PENDING')
-                      .map((req) => (
-                        <div key={req.id} className="bg-black/20 backdrop-blur-md border border-amber-500/30 p-4 rounded-xl flex flex-col gap-3 shadow-lg">
+                      .map((req, idx) => (
+                        <div key={`m-pendingkey-${req.id}-${idx}`} className="bg-black/20 backdrop-blur-md border border-amber-500/30 p-4 rounded-xl flex flex-col gap-3 shadow-lg">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex flex-col">
                               <span className="text-white font-black text-sm">{req.user}</span>
@@ -5385,13 +5418,13 @@ export default function App() {
               </div>
               
               <div className="flex flex-col gap-3">
-                {registeredUsers.length === 0 ? (
+                {ensureArray(registeredUsers).length === 0 ? (
                    <div className="text-center text-gray-400 text-sm mt-10">No registered users yet.</div>
                 ) : (
-                  registeredUsers.map((u, idx) => {
+                  ensureArray(registeredUsers).map((u, idx) => {
                     const avatarUrl = u.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop";
                     return (
-                      <div key={idx} className="bg-black/20 backdrop-blur-md border-l-4 border-green-500 rounded-r-xl rounded-l-sm p-4 relative overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.5)]  flex flex-col gap-2">
+                      <div key={`m-user-${u.email || u.phone || idx}-${idx}`} className="bg-black/20 backdrop-blur-md border-l-4 border-green-500 rounded-r-xl rounded-l-sm p-4 relative overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.5)]  flex flex-col gap-2">
                         <div className="flex justify-between items-start gap-2">
                           <div className="flex items-center gap-3">
                             <img 
@@ -5587,7 +5620,7 @@ export default function App() {
                     : ["Main Id safe", "Full safe NONROOT", "Esp crack anti-blacklist", "Auto headshot 100% working"];
 
                   setPanels(prev => [{
-                    id: prev.length + 1,
+                    id: Date.now(),
                     title: newPanelForm.title || "NEW PANEL",
                     category: newPanelForm.category || "NON ROOT",
                     thumbnailTitle: newPanelForm.title || "NEW PANEL",
@@ -5837,11 +5870,11 @@ export default function App() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
-                  {panels.length === 0 ? (
+                  {ensureArray(panels).length === 0 ? (
                     <div className="text-center text-gray-400 text-sm mt-10 bg-black/40 backdrop-blur-md p-6 rounded-xl border border-white/10">No active panels on website.</div>
                   ) : (
-                    panels.map(p => (
-                      <div key={p.id} className="bg-black/20 backdrop-blur-md border border-white/10 rounded-xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.5)]  flex flex-col gap-3">
+                    ensureArray(panels).map((p, idx) => (
+                      <div key={`manage-panel-${p.id}-${idx}`} className="bg-black/20 backdrop-blur-md border border-white/10 rounded-xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.5)]  flex flex-col gap-3">
                         <div className="flex gap-3 items-center">
                           <div className="w-16 h-16 rounded-lg bg-black/50 overflow-hidden shrink-0 border border-white/10 relative">
                             {p.isVideo ? (
@@ -5976,7 +6009,7 @@ export default function App() {
                     { name: "Gold Dust", url: "https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=2070&auto=format&fit=crop" }
                   ].map((preset, idx) => (
                     <button
-                      key={idx}
+                      key={`wall-preset-${preset.name}-${idx}`}
                       onClick={() => setBgSettings({ ...bgSettings, enabled: true, customImage: preset.url })}
                       className={`relative h-20 rounded-lg overflow-hidden border transition-all ${bgSettings.customImage === preset.url ? 'border-amber-400 scale-105 shadow-[0_0_12px_rgba(251,191,36,0.8)]' : 'border-white/20 hover:border-white/50'}`}
                     >
@@ -6544,7 +6577,7 @@ export default function App() {
                     <div className="flex flex-wrap gap-1.5">
                       {activeCoupons.map((c, i) => (
                         <button
-                          key={i}
+                          key={`active-coupon-${c.code}-${i}`}
                           type="button"
                           onClick={() => {
                             setCouponInputCode(c.code);
