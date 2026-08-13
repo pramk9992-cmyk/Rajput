@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import lordPremThrone from './assets/images/lord_prem_throne_1786425782320.jpg';
 import { LiveNotifications } from './components/LiveNotifications';
+import { initializeApp } from 'firebase/app';
+import { getDatabase, ref, set, onValue, push, onDisconnect, remove } from 'firebase/database';
 import {
   Menu,
   Wallet,
@@ -96,6 +98,21 @@ export function getYouTubeInfo(url: string | undefined | null) {
   }
   return null;
 }
+
+// PASTE YOUR FIREBASE CONFIG HERE
+const firebaseConfig = {
+  apiKey: "AIzaSyBgiGI6QYhUHnz6HrUOw5NEJ5tWG3_x0ew",
+  authDomain: "riyajroyx.firebaseapp.com",
+  databaseURL: "https://riyajroyx-default-rtdb.firebaseio.com",
+  projectId: "riyajroyx",
+  storageBucket: "riyajroyx.firebasestorage.app",
+  messagingSenderId: "338558331104",
+  appId: "1:338558331104:web:89b3ffc8f6722164d3c885",
+  measurementId: "G-VSQPG05BF1"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const database = getDatabase(firebaseApp);
 
 export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -939,7 +956,72 @@ export default function App() {
     localStorage.setItem('app_paymentHistory', JSON.stringify(paymentHistory));
   }, [paymentHistory]);
 
-  const syncToServer = () => {
+  const [onlineUsersCount, setOnlineUsersCount] = useState(1);
+
+  // Firebase Realtime Database Presence API
+  useEffect(() => {
+    const presenceRef = ref(database, 'presence');
+    const myPresenceRef = push(presenceRef);
+    let specificRef: any = null;
+
+    if (myPresenceRef.key) {
+      specificRef = ref(database, `presence/${myPresenceRef.key}`);
+      onDisconnect(specificRef).remove();
+      set(specificRef, {
+        online: true,
+        timestamp: Date.now()
+      }).catch(e => {});
+    }
+
+    const unsubscribePresence = onValue(presenceRef, (snapshot) => {
+      const val = snapshot.val();
+      if (val) {
+        const count = Object.keys(val).length;
+        setOnlineUsersCount(Math.max(1, count));
+      } else {
+        setOnlineUsersCount(1);
+      }
+    });
+
+    return () => {
+      unsubscribePresence();
+      if (specificRef) {
+        remove(specificRef).catch((e: any) => {});
+      } else {
+        remove(myPresenceRef).catch((e: any) => {});
+      }
+    };
+  }, []);
+
+  const isSyncingFromFirebase = useRef(false);
+
+  useEffect(() => {
+    const stateRef = ref(database, 'appState');
+    const unsubscribe = onValue(stateRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data && data.initialized) {
+        isSyncingFromFirebase.current = true;
+        if (data.panels) setPanels(data.panels);
+        if (data.registeredUsers) setRegisteredUsers(data.registeredUsers);
+        if (data.bannedUsers) setBannedUsers(data.bannedUsers);
+        if (data.paymentHistory) setPaymentHistory(data.paymentHistory);
+        if (data.keyRequests) setKeyRequests(data.keyRequests);
+        if (data.paymentSettings) setPaymentSettings(data.paymentSettings);
+        if (data.supportLinks) setSupportLinks(data.supportLinks);
+        if (data.accessFileSteps) setAccessFileSteps(data.accessFileSteps);
+        if (data.referWebsiteLink) setReferWebsiteLink(data.referWebsiteLink);
+        if (data.referBonusAmount) setReferBonusAmount(data.referBonusAmount);
+        setTimeout(() => {
+          isSyncingFromFirebase.current = false;
+        }, 300);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (isSyncingFromFirebase.current) return;
     const payload = {
       initialized: true,
       panels,
@@ -954,53 +1036,7 @@ export default function App() {
       referBonusAmount,
       updatedAt: Date.now()
     };
-    fetch('/api/state', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).catch(e => {});
-  };
-
-  useEffect(() => {
-    fetch('/api/state')
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.initialized) {
-          if (data.panels) setPanels(data.panels);
-          if (data.registeredUsers) setRegisteredUsers(data.registeredUsers);
-          if (data.bannedUsers) setBannedUsers(data.bannedUsers);
-          if (data.paymentHistory) setPaymentHistory(data.paymentHistory);
-          if (data.keyRequests) setKeyRequests(data.keyRequests);
-          if (data.paymentSettings) setPaymentSettings(data.paymentSettings);
-          if (data.supportLinks) setSupportLinks(data.supportLinks);
-          if (data.accessFileSteps) setAccessFileSteps(data.accessFileSteps);
-          if (data.referWebsiteLink) setReferWebsiteLink(data.referWebsiteLink);
-          if (data.referBonusAmount) setReferBonusAmount(data.referBonusAmount);
-        }
-      })
-      .catch(e => {});
-
-    const poll = setInterval(() => {
-      fetch('/api/state')
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.initialized) {
-            if (data.panels && JSON.stringify(data.panels) !== JSON.stringify(panels)) setPanels(data.panels);
-            if (data.registeredUsers && JSON.stringify(data.registeredUsers) !== JSON.stringify(registeredUsers)) setRegisteredUsers(data.registeredUsers);
-            if (data.paymentHistory && JSON.stringify(data.paymentHistory) !== JSON.stringify(paymentHistory)) setPaymentHistory(data.paymentHistory);
-            if (data.keyRequests && JSON.stringify(data.keyRequests) !== JSON.stringify(keyRequests)) setKeyRequests(data.keyRequests);
-            if (data.paymentSettings && JSON.stringify(data.paymentSettings) !== JSON.stringify(paymentSettings)) setPaymentSettings(data.paymentSettings);
-            if (data.supportLinks && JSON.stringify(data.supportLinks) !== JSON.stringify(supportLinks)) setSupportLinks(data.supportLinks);
-          }
-        })
-        .catch(e => {});
-    }, 3000);
-
-    return () => clearInterval(poll);
-  }, []);
-
-  useEffect(() => {
-    syncToServer();
+    set(ref(database, 'appState'), payload).catch(e => {});
   }, [panels, registeredUsers, bannedUsers, paymentHistory, keyRequests, paymentSettings, supportLinks, accessFileSteps, referWebsiteLink, referBonusAmount]);
 
   const playTickSound = () => {

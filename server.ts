@@ -44,6 +44,16 @@ app.get("/api/state", (req, res) => {
   res.json(state || { initialized: false });
 });
 
+app.get("/server_state.json", (req, res) => {
+  if (fs.existsSync(DATA_FILE)) {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename=server_state.json');
+    res.sendFile(DATA_FILE);
+  } else {
+    res.status(404).json({ error: "File not found" });
+  }
+});
+
 app.post("/api/state", (req, res) => {
   const newState = req.body;
   if (writeState(newState)) {
