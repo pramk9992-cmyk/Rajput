@@ -117,7 +117,7 @@ const database = getDatabase(firebaseApp);
 export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [currentView, setCurrentView] = useState<'home' | 'addFund' | 'spinWin' | 'referEarn' | 'admin' | 'adminUserHistory' | 'adminPayment' | 'adminKeys' | 'adminSpin' | 'adminRefer' | 'login' | 'profile' | 'customerSupport' | 'adminSupport' | 'adminPaymentSettings' | 'adminLogins' | 'adminAddPanel' | 'adminDeletePanel' | 'adminBgImage' | 'adminAccessFiles' | 'keyPending' | 'adminOwner' | 'staff'>('home');
-  const [staffTab, setStaffTab] = useState<'overview' | 'addPanel' | 'house' | 'managePanels' | 'supportLinks' | 'users' | 'payments' | 'userBanner' | 'fullHistory' | 'pendingKeys'>('overview');
+  const [staffTab, setStaffTab] = useState<'overview' | 'addPanel' | 'house' | 'managePanels' | 'supportLinks' | 'users' | 'payments' | 'userBanner' | 'fullHistory' | 'pendingKeys' | 'colorTheme'>('overview');
   const [staffSearchUser, setStaffSearchUser] = useState('');
   const [staffSearchPayment, setStaffSearchPayment] = useState('');
   const [staffEditingPanel, setStaffEditingPanel] = useState<any | null>(null);
@@ -159,18 +159,16 @@ export default function App() {
   const [showImportantNoticeModal, setShowImportantNoticeModal] = useState(true);
 
   const getAccountKey = (email?: string, phone?: string) => {
-    const key = (email || phone || '').toLowerCase().trim();
-    return key || 'guest';
+    const raw = (email || phone || '').toLowerCase().trim();
+    if (!raw) return 'guest';
+    return raw.replace(/[.#$*+?[\]\\/]/g, '_');
   };
 
   // Admin Configurable Spin Rewards (e.g., 5, 10, 20, 30, 50)
-  const [spinRewards, setSpinRewards] = useState<number[]>(() => {
-    const saved = localStorage.getItem('app_spinRewards');
-    return saved ? JSON.parse(saved) : [5, 10, 20, 30, 50];
-  });
+  const [spinRewards, setSpinRewards] = useState<number[]>([5, 10, 20, 30, 50]);
 
   useEffect(() => {
-    localStorage.setItem('app_spinRewards', JSON.stringify(spinRewards));
+    // localStorage removed setItem('app_spinRewards', JSON.stringify(spinRewards));
   }, [spinRewards]);
 
 
@@ -274,26 +272,20 @@ export default function App() {
     return () => clearInterval(progressInterval);
   }, [isAppLoading, loadingPhase]);
 
-  const [userAccountProfiles, setUserAccountProfiles] = useState<Record<string, { avatar?: string; keysBought?: number; totalAdded?: number; joinDate?: string }>>(() => {
-    const saved = localStorage.getItem('app_userAccountProfiles');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { return {}; }
-    }
-    return {};
-  });
+  const [userAccountProfiles, setUserAccountProfiles] = useState<Record<string, { avatar?: string; keysBought?: number; totalAdded?: number; joinDate?: string }>>({});
 
   useEffect(() => {
-    localStorage.setItem('app_userAccountProfiles', JSON.stringify(userAccountProfiles));
+    // localStorage removed setItem('app_userAccountProfiles', JSON.stringify(userAccountProfiles));
   }, [userAccountProfiles]);
 
   const [userProfile, setUserProfile] = useState(() => {
-    const saved = localStorage.getItem('app_userProfile');
+    const saved = null;
     if (saved) {
       try {
         const profile = JSON.parse(saved);
         if (profile && profile.isLoggedIn) {
-          const key = (profile.email || profile.phone || '').toLowerCase().trim();
-          const savedProfiles = localStorage.getItem('app_userAccountProfiles');
+          const key = getAccountKey(profile.email, profile.phone);
+          const savedProfiles = null;
           const profiles = savedProfiles ? JSON.parse(savedProfiles) : {};
           if (key && profiles[key]) {
             return {
@@ -321,7 +313,7 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('app_userProfile', JSON.stringify(userProfile));
+    // localStorage removed setItem('app_userProfile', JSON.stringify(userProfile));
     if (userProfile.isLoggedIn) {
       const key = getAccountKey(userProfile.email, userProfile.phone);
       if (key && key !== 'guest') {
@@ -339,86 +331,38 @@ export default function App() {
   }, [userProfile]);
 
   // Account-Specific Spin Timestamps, Coupon Used Timestamps, and Account Coupons
-  const [userSpinTimestamps, setUserSpinTimestamps] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem('app_userSpinTimestamps');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { return {}; }
-    }
-    const oldSaved = localStorage.getItem('app_lastSpinTimestamp');
-    return oldSaved ? { guest: Number(oldSaved) } : {};
-  });
+  const [userSpinTimestamps, setUserSpinTimestamps] = useState<Record<string, number>>({});
+  const [userCouponUsedTimestamps, setUserCouponUsedTimestamps] = useState<Record<string, number>>({});
+  const [userAccountCoupons, setUserAccountCoupons] = useState<Record<string, any[]>>({});
 
-  useEffect(() => {
-    localStorage.setItem('app_userSpinTimestamps', JSON.stringify(userSpinTimestamps));
-  }, [userSpinTimestamps]);
-
-  const [userCouponUsedTimestamps, setUserCouponUsedTimestamps] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem('app_userCouponUsedTimestamps');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { return {}; }
-    }
-    const oldSaved = localStorage.getItem('app_lastCouponUsedTimestamp');
-    return oldSaved ? { guest: Number(oldSaved) } : {};
-  });
-
-  useEffect(() => {
-    localStorage.setItem('app_userCouponUsedTimestamps', JSON.stringify(userCouponUsedTimestamps));
-  }, [userCouponUsedTimestamps]);
-
-  const [userAccountCoupons, setUserAccountCoupons] = useState<Record<string, Array<{
-    code: string;
-    discount: number;
-    createdAt: number;
-    isUsed: boolean;
-    usedAt?: number;
-  }>>>(() => {
-    const saved = localStorage.getItem('app_userAccountCoupons');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { return {}; }
-    }
-    const oldSaved = localStorage.getItem('app_userCoupons');
-    return oldSaved ? { guest: JSON.parse(oldSaved) } : {};
-  });
-
-  useEffect(() => {
-    localStorage.setItem('app_userAccountCoupons', JSON.stringify(userAccountCoupons));
-  }, [userAccountCoupons]);
-
-  // Derived active account spin/coupon state
   const activeAccKey = getAccountKey(userProfile.email, userProfile.phone);
   const lastSpinTimestamp = userProfile.isLoggedIn ? (userSpinTimestamps[activeAccKey] || 0) : 0;
   const lastCouponUsedTimestamp = userProfile.isLoggedIn ? (userCouponUsedTimestamps[activeAccKey] || 0) : 0;
   const userCoupons = userProfile.isLoggedIn ? (userAccountCoupons[activeAccKey] || []) : [];
 
-  const [userWallets, setUserWallets] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem('app_userWallets');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { return {}; }
-    }
-    return {};
-  });
+  const [userWallets, setUserWallets] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    localStorage.setItem('app_userWallets', JSON.stringify(userWallets));
+    // localStorage removed setItem('app_userWallets', JSON.stringify(userWallets));
   }, [userWallets]);
 
   const [userBalance, setUserBalance] = useState(() => {
-    const savedProfile = localStorage.getItem('app_userProfile');
+    const savedProfile = null;
     const profile = savedProfile ? JSON.parse(savedProfile) : null;
     if (profile && profile.isLoggedIn) {
-      const key = (profile.email || profile.phone || '').toLowerCase().trim();
-      const savedWallets = localStorage.getItem('app_userWallets');
+      const key = getAccountKey(profile.email, profile.phone);
+      const savedWallets = null;
       const wallets = savedWallets ? JSON.parse(savedWallets) : {};
       if (key && key in wallets) {
         return Number(wallets[key]);
       }
     }
-    const saved = localStorage.getItem('app_userBalance');
+    const saved = null;
     return saved ? Number(saved) : 0;
   });
 
   useEffect(() => {
-    localStorage.setItem('app_userBalance', userBalance.toString());
+    // localStorage removed setItem('app_userBalance', userBalance.toString());
     if (userProfile.isLoggedIn) {
       const key = getAccountKey(userProfile.email, userProfile.phone);
       if (key && key !== 'guest') {
@@ -431,7 +375,7 @@ export default function App() {
   }, [userBalance, userProfile.isLoggedIn, userProfile.email, userProfile.phone]);
 
   const [paymentSettings, setPaymentSettings] = useState(() => {
-    const saved = localStorage.getItem('app_paymentSettings');
+    const saved = null;
     return saved ? JSON.parse(saved) : {
       qrImage: 'https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg',
       upiId: '9876543210@paytm'
@@ -439,11 +383,11 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('app_paymentSettings', JSON.stringify(paymentSettings));
+    // localStorage removed setItem('app_paymentSettings', JSON.stringify(paymentSettings));
   }, [paymentSettings]);
 
   const [supportLinks, setSupportLinks] = useState(() => {
-    const saved = localStorage.getItem('app_supportLinks');
+    const saved = null;
     return saved ? JSON.parse(saved) : {
       telegram: 'https://t.me/yourchannel',
       whatsapp: 'https://wa.me/1234567890',
@@ -452,11 +396,11 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('app_supportLinks', JSON.stringify(supportLinks));
+    // localStorage removed setItem('app_supportLinks', JSON.stringify(supportLinks));
   }, [supportLinks]);
 
   const [accessFileSteps, setAccessFileSteps] = useState(() => {
-    const saved = localStorage.getItem('app_accessFileSteps');
+    const saved = null;
     return saved ? JSON.parse(saved) : {
       step1Title: 'Step 1: Watch YouTube Video Tutorial',
       step1Url: 'https://www.youtube.com',
@@ -469,14 +413,14 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('app_accessFileSteps', JSON.stringify(accessFileSteps));
+    // localStorage removed setItem('app_accessFileSteps', JSON.stringify(accessFileSteps));
   }, [accessFileSteps]);
 
   const [showAccessFilesModal, setShowAccessFilesModal] = useState(false);
   const [activePanelFileUrl, setActivePanelFileUrl] = useState('');
 
   const [panels, setPanels] = useState(() => {
-    const saved = localStorage.getItem('app_panels');
+    const saved = null;
     return saved ? JSON.parse(saved) : [
       {
         id: 1,
@@ -501,22 +445,23 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('app_panels', JSON.stringify(panels));
+    // localStorage removed setItem('app_panels', JSON.stringify(panels));
   }, [panels]);
 
   const [bgSettings, setBgSettings] = useState(() => {
-    const saved = localStorage.getItem('app_bgSettings');
+    const saved = null;
     return saved ? JSON.parse(saved) : {
       enabled: true,
       customImage: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop',
       enableFlowers: true,
       flowerSpeed: 1,
-      darknessOverlay: 25
+      darknessOverlay: 25,
+      themeHue: 0
     };
   });
 
   useEffect(() => {
-    localStorage.setItem('app_bgSettings', JSON.stringify(bgSettings));
+    // localStorage removed setItem('app_bgSettings', JSON.stringify(bgSettings));
   }, [bgSettings]);
 
   const [flowerParticles] = useState(() => {
@@ -587,12 +532,12 @@ export default function App() {
     date: string;
     status: string;
   }[]>(() => {
-    const saved = localStorage.getItem('app_spinRequests');
+    const saved = null;
     return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
-    localStorage.setItem('app_spinRequests', JSON.stringify(spinRequests));
+    // localStorage removed setItem('app_spinRequests', JSON.stringify(spinRequests));
   }, [spinRequests]);
 
   const [referRequests, setReferRequests] = useState<{
@@ -606,31 +551,31 @@ export default function App() {
     date: string;
     status: string;
   }[]>(() => {
-    const saved = localStorage.getItem('app_referRequests');
+    const saved = null;
     return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
-    localStorage.setItem('app_referRequests', JSON.stringify(referRequests));
+    // localStorage removed setItem('app_referRequests', JSON.stringify(referRequests));
   }, [referRequests]);
 
   // Admin Configurable Referral Website Link & Bonus Amount
   const [referWebsiteLink, setReferWebsiteLink] = useState<string>(() => {
-    const saved = localStorage.getItem('app_referWebsiteLink');
+    const saved = null;
     return saved || 'https://website.com';
   });
 
   useEffect(() => {
-    localStorage.setItem('app_referWebsiteLink', referWebsiteLink);
+    // localStorage removed setItem('app_referWebsiteLink', referWebsiteLink);
   }, [referWebsiteLink]);
 
   const [referBonusAmount, setReferBonusAmount] = useState<number>(() => {
-    const saved = localStorage.getItem('app_referBonusAmount');
+    const saved = null;
     return saved ? Number(saved) : 50;
   });
 
   useEffect(() => {
-    localStorage.setItem('app_referBonusAmount', referBonusAmount.toString());
+    // localStorage removed setItem('app_referBonusAmount', referBonusAmount.toString());
   }, [referBonusAmount]);
 
   const [referSettingsSavedMsg, setReferSettingsSavedMsg] = useState('');
@@ -654,12 +599,12 @@ export default function App() {
     date: string;
     exceptFileLink?: string;
   }[]>(() => {
-    const saved = localStorage.getItem('app_keyRequests');
+    const saved = null;
     return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
-    localStorage.setItem('app_keyRequests', JSON.stringify(keyRequests));
+    // localStorage removed setItem('app_keyRequests', JSON.stringify(keyRequests));
   }, [keyRequests]);
 
   const [manualKeyForm, setManualKeyForm] = useState({
@@ -670,26 +615,26 @@ export default function App() {
   });
 
   const [registeredUsers, setRegisteredUsers] = useState<{name?: string, email: string, phone: string, password: string, avatar?: string, joinDate: string}[]>(() => {
-    const saved = localStorage.getItem('app_registeredUsers');
+    const saved = null;
     return saved ? JSON.parse(saved) : [];
   });
 
   const [bannedUsers, setBannedUsers] = useState<string[]>(() => {
-    const saved = localStorage.getItem('app_bannedUsers');
+    const saved = null;
     return saved ? JSON.parse(saved) : [];
   });
 
   const [authStats, setAuthStats] = useState(() => {
-    const saved = localStorage.getItem('app_authStats');
+    const saved = null;
     return saved ? JSON.parse(saved) : { logins: 0, logouts: 0 };
   });
 
   useEffect(() => {
-    localStorage.setItem('app_bannedUsers', JSON.stringify(bannedUsers));
+    // localStorage removed setItem('app_bannedUsers', JSON.stringify(bannedUsers));
   }, [bannedUsers]);
 
   useEffect(() => {
-    localStorage.setItem('app_authStats', JSON.stringify(authStats));
+    // localStorage removed setItem('app_authStats', JSON.stringify(authStats));
   }, [authStats]);
 
 
@@ -708,7 +653,7 @@ export default function App() {
   } | null>(null);
 
   useEffect(() => {
-    localStorage.setItem('app_registeredUsers', JSON.stringify(registeredUsers));
+    // localStorage removed setItem('app_registeredUsers', JSON.stringify(registeredUsers));
   }, [registeredUsers]);
 
 
@@ -924,15 +869,15 @@ export default function App() {
   const [utr, setUtr] = useState('');
   const [paymentScreenshot, setPaymentScreenshot] = useState<string>('');
   const [currentTxId, setCurrentTxId] = useState<number | null>(() => {
-    const saved = localStorage.getItem('app_currentTxId');
+    const saved = null;
     return saved ? Number(saved) : null;
   });
 
   useEffect(() => {
     if (currentTxId !== null) {
-      localStorage.setItem('app_currentTxId', currentTxId.toString());
+      // localStorage removed setItem('app_currentTxId', currentTxId.toString());
     } else {
-      localStorage.removeItem('app_currentTxId');
+      // localStorage removed removeItem('app_currentTxId');
     }
   }, [currentTxId]);
 
@@ -948,12 +893,12 @@ export default function App() {
     userPassword?: string;
     userAccountKey?: string;
   }[]>(() => {
-    const saved = localStorage.getItem('app_paymentHistory');
+    const saved = null;
     return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
-    localStorage.setItem('app_paymentHistory', JSON.stringify(paymentHistory));
+    // localStorage removed setItem('app_paymentHistory', JSON.stringify(paymentHistory));
   }, [paymentHistory]);
 
   const [onlineUsersCount, setOnlineUsersCount] = useState(1);
@@ -993,7 +938,8 @@ export default function App() {
     };
   }, []);
 
-  const isSyncingFromFirebase = useRef(false);
+  const isSyncingFromFirebase = useRef(true);
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
   useEffect(() => {
     const stateRef = ref(database, 'appState');
@@ -1011,17 +957,30 @@ export default function App() {
         if (data.accessFileSteps) setAccessFileSteps(data.accessFileSteps);
         if (data.referWebsiteLink) setReferWebsiteLink(data.referWebsiteLink);
         if (data.referBonusAmount) setReferBonusAmount(data.referBonusAmount);
+        if (data.spinRewards) setSpinRewards(data.spinRewards);
+        if (data.spinRequests) setSpinRequests(data.spinRequests);
+        if (data.referRequests) setReferRequests(data.referRequests);
+        if (data.userWallets) setUserWallets(data.userWallets);
+        if (data.userAccountProfiles) setUserAccountProfiles(data.userAccountProfiles);
+        if (data.userSpinTimestamps) setUserSpinTimestamps(data.userSpinTimestamps);
+        if (data.userCouponUsedTimestamps) setUserCouponUsedTimestamps(data.userCouponUsedTimestamps);
+        if (data.userAccountCoupons) setUserAccountCoupons(data.userAccountCoupons);
+        if (data.bgSettings) setBgSettings(data.bgSettings);
+        if (data.authStats) setAuthStats(data.authStats);
+        if (data.userProfile) setUserProfile(data.userProfile);
+        if (data.userBalance !== undefined) setUserBalance(data.userBalance);
+        }
         setTimeout(() => {
           isSyncingFromFirebase.current = false;
+          setInitialDataLoaded(true);
         }, 300);
-      }
     });
 
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (isSyncingFromFirebase.current) return;
+    if (isSyncingFromFirebase.current || !initialDataLoaded) return;
     const payload = {
       initialized: true,
       panels,
@@ -1034,10 +993,45 @@ export default function App() {
       accessFileSteps,
       referWebsiteLink,
       referBonusAmount,
+      spinRewards,
+      spinRequests,
+      referRequests,
+      userWallets,
+      userAccountProfiles,
+      userSpinTimestamps,
+      userCouponUsedTimestamps,
+      userAccountCoupons,
+      bgSettings,
+      authStats,
+      userProfile,
+      userBalance,
       updatedAt: Date.now()
     };
     set(ref(database, 'appState'), payload).catch(e => {});
-  }, [panels, registeredUsers, bannedUsers, paymentHistory, keyRequests, paymentSettings, supportLinks, accessFileSteps, referWebsiteLink, referBonusAmount]);
+  }, [
+    panels,
+    registeredUsers,
+    bannedUsers,
+    paymentHistory,
+    keyRequests,
+    paymentSettings,
+    supportLinks,
+    accessFileSteps,
+    referWebsiteLink,
+    referBonusAmount,
+    spinRewards,
+    spinRequests,
+    referRequests,
+    userWallets,
+    userAccountProfiles,
+    userSpinTimestamps,
+    userCouponUsedTimestamps,
+    userAccountCoupons,
+    bgSettings,
+    authStats,
+    userProfile,
+    userBalance
+  ]);
 
   const playTickSound = () => {
     try {
@@ -1118,7 +1112,15 @@ export default function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#050000] text-white font-sans relative overflow-x-hidden selection:bg-fuchsia-500/30 antialiased">
+    <div 
+      className="min-h-screen bg-[#050000] text-white font-sans relative overflow-x-hidden selection:bg-fuchsia-500/30 antialiased"
+      style={{ filter: `hue-rotate(${bgSettings.themeHue || 0}deg)` }}
+    >
+      <style>{`
+        img, video {
+          filter: hue-rotate(-${bgSettings.themeHue || 0}deg);
+        }
+      `}</style>
       {/* Complex Background Simulation */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         {/* Admin Custom DSLR Background Image */}
@@ -1127,13 +1129,16 @@ export default function App() {
             className="absolute inset-0 bg-cover bg-center transition-all duration-700 scale-105"
             style={{ 
               backgroundImage: `url(${bgSettings.customImage})`,
-              filter: `contrast(1.15) brightness(${100 - (bgSettings.darknessOverlay || 15)}%)`
+              filter: `contrast(1.15) brightness(${100 - (bgSettings.darknessOverlay || 15)}%) hue-rotate(-${bgSettings.themeHue || 0}deg)`
             }}
           />
         ) : (
           <>
             {/* Default Background Animation Layer - Crisp Bright Photo View */}
-            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center"></div>
+            <div 
+              className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center"
+              style={{ filter: `hue-rotate(-${bgSettings.themeHue || 0}deg)` }}
+            ></div>
           </>
         )}
         
@@ -3581,8 +3586,8 @@ export default function App() {
                     <div className="flex items-end">
                       <button
                         onClick={() => {
-                          localStorage.setItem('app_referWebsiteLink', referWebsiteLink);
-                          localStorage.setItem('app_referBonusAmount', referBonusAmount.toString());
+                          // localStorage removed setItem('app_referWebsiteLink', referWebsiteLink);
+                          // localStorage removed setItem('app_referBonusAmount', referBonusAmount.toString());
                           setReferSettingsSavedMsg('✓ Website Referral Link & Bonus Amount Updated Successfully!');
                           setTimeout(() => setReferSettingsSavedMsg(''), 4000);
                         }}
@@ -4133,7 +4138,7 @@ export default function App() {
 
                 <button 
                   onClick={() => { 
-                    localStorage.setItem('app_supportLinks', JSON.stringify(supportLinks));
+                    // localStorage removed setItem('app_supportLinks', JSON.stringify(supportLinks));
                     alert('✅ Owner Telegram Link permanently save ho gaya hai!'); 
                     setCurrentView('admin'); 
                   }} 
@@ -4215,7 +4220,7 @@ export default function App() {
                     const formattedUrl = formatExternalUrl(accessFileSteps.directFileUrl) || 'https://t.me/yourchannel';
                     const updated = { ...accessFileSteps, directFileUrl: formattedUrl, step2Url: formattedUrl };
                     setAccessFileSteps(updated);
-                    localStorage.setItem('app_accessFileSteps', JSON.stringify(updated));
+                    // localStorage removed setItem('app_accessFileSteps', JSON.stringify(updated));
                     alert('✅ ACCESS FILES Telegram Link successfully save ho gaya!'); 
                     setCurrentView('admin'); 
                   }} 
@@ -4358,12 +4363,65 @@ export default function App() {
                       </button>
 
                       <button 
+                        onClick={() => setStaffTab('colorTheme')}
+                        className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 p-4 rounded-xl text-white font-black text-sm uppercase flex items-center justify-between shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all hover:scale-[1.02]"
+                      >
+                        <span className="flex items-center gap-2.5"><Palette size={20} /> 🎨 Color Changes</span>
+                        <ArrowRight size={18} />
+                      </button>
+
+                      <button 
                         onClick={() => setStaffTab('payments')}
                         className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 p-4 rounded-xl text-white font-black text-sm uppercase flex items-center justify-between shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all hover:scale-[1.02] md:col-span-2"
                       >
                         <span className="flex items-center gap-2.5"><Wallet size={20} /> 💰 Money & Payments ("Kisne Kisne Paisa Lagaya")</span>
                         <ArrowRight size={18} />
                       </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STAFF TAB: COLOR THEME */}
+              {staffTab === 'colorTheme' && (
+                <div className="flex flex-col gap-4">
+                  <div className="bg-black/20 backdrop-blur-md border border-cyan-500/40 rounded-2xl p-5 shadow-2xl flex flex-col gap-5 text-left">
+                    <h3 className="text-lg font-black text-cyan-400 flex items-center gap-2 uppercase tracking-wide">
+                      <Palette size={20} /> 🎨 Theme Color Changes
+                    </h3>
+                    <p className="text-gray-300 text-xs">
+                      Yahan se aap website ka rang (color theme) apne hisaab se badal sakte hain. Niche diye gaye 7 rangon mein se koi ek chunein.
+                    </p>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+                      {[
+                        { name: 'Pink / Fuchsia', hue: 0, colorClass: 'bg-pink-500' },
+                        { name: 'Red Theme', hue: 60, colorClass: 'bg-red-500' },
+                        { name: 'Orange Theme', hue: 90, colorClass: 'bg-orange-500' },
+                        { name: 'Yellow Theme', hue: 120, colorClass: 'bg-yellow-500' },
+                        { name: 'Green Theme', hue: 180, colorClass: 'bg-green-500' },
+                        { name: 'Cyan Theme', hue: 240, colorClass: 'bg-cyan-500' },
+                        { name: 'Blue Theme', hue: 280, colorClass: 'bg-blue-500' },
+                        { name: 'Purple Theme', hue: 330, colorClass: 'bg-purple-500' },
+                      ].map(theme => (
+                        <button
+                          key={theme.name}
+                          onClick={() => setBgSettings({ ...bgSettings, themeHue: theme.hue })}
+                          className={`relative p-3 rounded-xl font-bold text-xs uppercase transition-all duration-300 border-2 overflow-hidden flex flex-col items-center gap-2
+                            ${bgSettings.themeHue === theme.hue ? 'border-white scale-105 shadow-[0_0_20px_rgba(255,255,255,0.4)]' : 'border-transparent hover:border-white/30 hover:scale-105'}
+                          `}
+                        >
+                          <div className={`w-8 h-8 rounded-full ${theme.colorClass} shadow-inner border border-white/20`} />
+                          <span className="text-white z-10 text-center leading-tight">{theme.name}</span>
+                          {bgSettings.themeHue === theme.hue && (
+                            <div className="absolute inset-0 bg-white/10 z-0"></div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="mt-2 text-center text-[10px] text-gray-400 italic">
+                      Note: Rang badalne par website ka global gradient aur buttons ka color change ho jayega.
                     </div>
                   </div>
                 </div>
@@ -4947,7 +5005,7 @@ export default function App() {
 
                     <button
                       onClick={() => {
-                        localStorage.setItem('app_supportLinks', JSON.stringify(supportLinks));
+                        // localStorage removed setItem('app_supportLinks', JSON.stringify(supportLinks));
                         alert('✅ Telegram aur WhatsApp Links successfully update ho gaye hain!');
                       }}
                       className="mt-2 w-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-black py-3.5 rounded-xl shadow-[0_0_20px_rgba(56,189,248,0.5)] transition-all uppercase tracking-wider text-xs flex items-center justify-center gap-2 active:scale-95"
@@ -5307,7 +5365,7 @@ export default function App() {
                 </div>
                 
                 <button onClick={() => { 
-                  localStorage.setItem('app_paymentSettings', JSON.stringify(paymentSettings));
+                  // localStorage removed setItem('app_paymentSettings', JSON.stringify(paymentSettings));
                   alert('Payment settings saved permanently!'); 
                   setCurrentView('admin'); 
                 }} className="mt-6 w-full bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white font-black py-3 rounded-lg shadow-[0_0_15px_rgba(217,70,239,0.4)] transition-colors">SAVE PAYMENT DETAILS PERMANENTLY</button>
