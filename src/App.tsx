@@ -694,6 +694,8 @@ export default function App() {
     localStorage.setItem('app_registeredUsers', JSON.stringify(registeredUsers));
   }, [registeredUsers]);
 
+
+
   const [unreadLogins, setUnreadLogins] = useState(0);
   const [showRejectedAlert, setShowRejectedAlert] = useState(true);
   const [selectedPlans, setSelectedPlans] = useState<Record<number, number>>({});
@@ -936,6 +938,70 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('app_paymentHistory', JSON.stringify(paymentHistory));
   }, [paymentHistory]);
+
+  const syncToServer = () => {
+    const payload = {
+      initialized: true,
+      panels,
+      registeredUsers,
+      bannedUsers,
+      paymentHistory,
+      keyRequests,
+      paymentSettings,
+      supportLinks,
+      accessFileSteps,
+      referWebsiteLink,
+      referBonusAmount,
+      updatedAt: Date.now()
+    };
+    fetch('/api/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(e => {});
+  };
+
+  useEffect(() => {
+    fetch('/api/state')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.initialized) {
+          if (data.panels) setPanels(data.panels);
+          if (data.registeredUsers) setRegisteredUsers(data.registeredUsers);
+          if (data.bannedUsers) setBannedUsers(data.bannedUsers);
+          if (data.paymentHistory) setPaymentHistory(data.paymentHistory);
+          if (data.keyRequests) setKeyRequests(data.keyRequests);
+          if (data.paymentSettings) setPaymentSettings(data.paymentSettings);
+          if (data.supportLinks) setSupportLinks(data.supportLinks);
+          if (data.accessFileSteps) setAccessFileSteps(data.accessFileSteps);
+          if (data.referWebsiteLink) setReferWebsiteLink(data.referWebsiteLink);
+          if (data.referBonusAmount) setReferBonusAmount(data.referBonusAmount);
+        }
+      })
+      .catch(e => {});
+
+    const poll = setInterval(() => {
+      fetch('/api/state')
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.initialized) {
+            if (data.panels && JSON.stringify(data.panels) !== JSON.stringify(panels)) setPanels(data.panels);
+            if (data.registeredUsers && JSON.stringify(data.registeredUsers) !== JSON.stringify(registeredUsers)) setRegisteredUsers(data.registeredUsers);
+            if (data.paymentHistory && JSON.stringify(data.paymentHistory) !== JSON.stringify(paymentHistory)) setPaymentHistory(data.paymentHistory);
+            if (data.keyRequests && JSON.stringify(data.keyRequests) !== JSON.stringify(keyRequests)) setKeyRequests(data.keyRequests);
+            if (data.paymentSettings && JSON.stringify(data.paymentSettings) !== JSON.stringify(paymentSettings)) setPaymentSettings(data.paymentSettings);
+            if (data.supportLinks && JSON.stringify(data.supportLinks) !== JSON.stringify(supportLinks)) setSupportLinks(data.supportLinks);
+          }
+        })
+        .catch(e => {});
+    }, 3000);
+
+    return () => clearInterval(poll);
+  }, []);
+
+  useEffect(() => {
+    syncToServer();
+  }, [panels, registeredUsers, bannedUsers, paymentHistory, keyRequests, paymentSettings, supportLinks, accessFileSteps, referWebsiteLink, referBonusAmount]);
 
   const playTickSound = () => {
     try {
