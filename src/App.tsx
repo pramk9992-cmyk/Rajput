@@ -72,6 +72,42 @@ export function ensureArray<T = any>(val: any): T[] {
   return [];
 }
 
+export function processAsyncMediaUpload(
+  file: File,
+  onStartLoading?: () => void,
+  onFinishLoading?: (mediaUrl: string, isVideo: boolean) => void
+) {
+  if (!file) return;
+  if (onStartLoading) onStartLoading();
+
+  const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi|3gp|m4v)$/i.test(file.name);
+
+  // Instant Object URL creation - 0ms execution time, 0 main-thread CPU blocking
+  const objectUrl = URL.createObjectURL(file);
+
+  // Asynchronous non-blocking task queue execution
+  setTimeout(() => {
+    if (isVideo) {
+      if (onFinishLoading) onFinishLoading(objectUrl, true);
+    } else {
+      if (file.size < 2 * 1024 * 1024) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          if (evt.target?.result && onFinishLoading) {
+            onFinishLoading(evt.target.result as string, false);
+          }
+        };
+        reader.onerror = () => {
+          if (onFinishLoading) onFinishLoading(objectUrl, false);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        if (onFinishLoading) onFinishLoading(objectUrl, false);
+      }
+    }
+  }, 30);
+}
+
 export function sanitizeForFirebase<T>(obj: T): T {
   if (obj === undefined) return "" as any;
   if (obj === null || typeof obj !== 'object') return obj;
@@ -81,7 +117,12 @@ export function sanitizeForFirebase<T>(obj: T): T {
   const cleanObj: Record<string, any> = {};
   for (const [key, val] of Object.entries(obj as Record<string, any>)) {
     if (val !== undefined) {
-      cleanObj[key] = sanitizeForFirebase(val);
+      if (typeof val === 'string' && val.length > 500000) {
+        // Prevent huge base64 payloads from freezing Firebase Realtime Database
+        cleanObj[key] = val.substring(0, 500);
+      } else {
+        cleanObj[key] = sanitizeForFirebase(val);
+      }
     }
   }
   return cleanObj as T;
@@ -513,6 +554,7 @@ export default function App() {
   });
 
   const [expandedPanels, setExpandedPanels] = useState<Record<number, boolean>>({});
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
 
   const [newPanelForm, setNewPanelForm] = useState({
     title: '',
@@ -4510,22 +4552,29 @@ export default function App() {
                           className="flex-1 bg-black/20 backdrop-blur-md border border-white/20 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-fuchsia-400"
                         />
                         <label className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-bold px-3 py-2.5 rounded-xl cursor-pointer flex items-center gap-1 shrink-0">
-                          <Camera size={14} /> Upload
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setNewPanelForm({ ...newPanelForm, image: reader.result as string });
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                          />
+                          {isUploadingMedia ? (
+                            <span className="flex items-center gap-1 text-xs animate-pulse">
+                              <Loader2 className="animate-spin" size={14} /> Uploading...
+                            </span>
+                          ) : (
+                            <>
+                              <Camera size={14} /> Upload
+                              <input
+                                type="file"
+                                accept="image/*,video/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    processAsyncMediaUpload(file, () => setIsUploadingMedia(true), (url, isVideo) => {
+                                      setNewPanelForm(prev => ({ ...prev, image: url, isVideo }));
+                                      setIsUploadingMedia(false);
+                                    });
+                                  }
+                                }}
+                              />
+                            </>
+                          )}
                         </label>
                       </div>
                     </div>
@@ -4658,22 +4707,29 @@ export default function App() {
                             className="flex-1 bg-black/20 backdrop-blur-md border border-white/20 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-amber-400"
                           />
                           <label className="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold px-3 py-2.5 rounded-xl cursor-pointer flex items-center gap-1 shrink-0">
-                            <Camera size={14} /> Upload
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onloadend = () => {
-                                    setHousePanelForm({ ...housePanelForm, image: reader.result as string });
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              }}
-                            />
+                            {isUploadingMedia ? (
+                              <span className="flex items-center gap-1 text-xs animate-pulse">
+                                <Loader2 className="animate-spin" size={14} /> Uploading...
+                              </span>
+                            ) : (
+                              <>
+                                <Camera size={14} /> Upload
+                                <input
+                                  type="file"
+                                  accept="image/*,video/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      processAsyncMediaUpload(file, () => setIsUploadingMedia(true), (url, isVideo) => {
+                                        setHousePanelForm(prev => ({ ...prev, image: url, isVideo }));
+                                        setIsUploadingMedia(false);
+                                      });
+                                    }
+                                  }}
+                                />
+                              </>
+                            )}
                           </label>
                         </div>
                       </div>
@@ -5478,25 +5534,29 @@ export default function App() {
                       className="w-full bg-black/40 backdrop-blur-md border border-white/20 rounded-lg py-3 px-3 text-sm font-bold text-white focus:outline-none focus:border-cyan-400 transition-all"
                     />
                     <label className="bg-cyan-500 hover:bg-cyan-400 text-black font-black py-3 px-4 rounded-lg cursor-pointer transition-colors flex items-center justify-center shrink-0">
-                      Upload
-                      <input 
-                        type="file" 
-                        accept="image/*,video/*" 
-                        className="hidden" 
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = (evt) => {
-                              if (evt.target?.result) {
-                                const isVideo = file.type.startsWith('video/');
-                                setNewPanelForm(prev => ({...prev, image: evt.target!.result as string, isVideo}));
+                      {isUploadingMedia ? (
+                        <span className="flex items-center gap-1.5 text-xs animate-pulse">
+                          <Loader2 className="animate-spin" size={16} /> Uploading...
+                        </span>
+                      ) : (
+                        <>
+                          Upload
+                          <input 
+                            type="file" 
+                            accept="image/*,video/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                processAsyncMediaUpload(file, () => setIsUploadingMedia(true), (url, isVideo) => {
+                                  setNewPanelForm(prev => ({...prev, image: url, isVideo}));
+                                  setIsUploadingMedia(false);
+                                });
                               }
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
+                            }}
+                          />
+                        </>
+                      )}
                     </label>
                   </div>
                 </div>
@@ -5684,25 +5744,29 @@ export default function App() {
                         className="w-full bg-black/40 backdrop-blur-md border border-white/20 rounded-lg py-3 px-3 text-sm font-bold text-white focus:outline-none focus:border-cyan-400 transition-all"
                       />
                       <label className="bg-cyan-500 hover:bg-cyan-400 text-black font-black py-3 px-4 rounded-lg cursor-pointer transition-colors flex items-center justify-center shrink-0">
-                        Upload
-                        <input 
-                          type="file" 
-                          accept="image/*,video/*" 
-                          className="hidden" 
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = (evt) => {
-                                if (evt.target?.result) {
-                                  const isVideo = file.type.startsWith('video/');
-                                  setEditingPanel(prev => prev ? ({...prev, image: evt.target!.result as string, isVideo}) : null);
+                        {isUploadingMedia ? (
+                          <span className="flex items-center gap-1.5 text-xs animate-pulse">
+                            <Loader2 className="animate-spin" size={16} /> Uploading...
+                          </span>
+                        ) : (
+                          <>
+                            Upload
+                            <input 
+                              type="file" 
+                              accept="image/*,video/*" 
+                              className="hidden" 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  processAsyncMediaUpload(file, () => setIsUploadingMedia(true), (url, isVideo) => {
+                                    setEditingPanel(prev => prev ? ({...prev, image: url, isVideo}) : null);
+                                    setIsUploadingMedia(false);
+                                  });
                                 }
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                        />
+                              }}
+                            />
+                          </>
+                        )}
                       </label>
                     </div>
                   </div>
